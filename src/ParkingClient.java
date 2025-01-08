@@ -29,7 +29,7 @@
 
 //                 System.out.print("Full Name: ");
 //                 fullName = scanner.nextLine();
-                
+
 //                 // Validate email
 //                 while (true) {
 //                     System.out.print("Email: ");
@@ -73,7 +73,6 @@
 //                         System.out.println("Car plate must be a 7-digit number.");
 //                     }
 //                 }
-
 
 //                 // Validate password
 //                 while (true) {
@@ -127,12 +126,12 @@
 //         }
 //     }
 // }
-
 import java.io.*;
 import java.net.*;
 import java.security.*;
 import java.util.Scanner;
 import javax.crypto.*;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -141,6 +140,8 @@ public class ParkingClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 3000;
     private static final Logger LOGGER = Logger.getLogger(ParkingClient.class.getName());
+
+    private static User currentUser; // Global variable to store the current user
 
     public static void main(String[] args) {
         Socket socket = null;
@@ -175,16 +176,21 @@ public class ParkingClient {
             LOGGER.info("Session Key (Client): " + bytesToHex(sessionKey.getEncoded()));
 
             boolean running = true;
+            boolean loggedIn = false;
             while (running) {
-                System.out.println("1. Register");
-                System.out.println("2. Login");
+                if (!loggedIn) {
+                    System.out.println("1. Register");
+                    System.out.println("2. Login");
+                }
+                else{
                 System.out.println("3. Reserve");
                 System.out.println("4. Close connection");
+                }
                 System.out.print("Choose an option: ");
                 int choice = scanner.nextInt();
                 scanner.nextLine(); // consume newline
 
-                if (choice == 1) {
+                if (choice == 1 && !loggedIn) {
                     // Collect user registration data
                     String fullName;
                     String userType;
@@ -260,7 +266,7 @@ public class ParkingClient {
                     // Receive response from server
                     String response = (String) in.readObject();
                     System.out.println(response);
-                } else if (choice == 2) {
+                } else if (choice == 2 && !loggedIn) {
                     // Collect login data
                     System.out.print("Email: ");
                     String email = scanner.nextLine();
@@ -282,39 +288,51 @@ public class ParkingClient {
                         System.out.println("User Type: " + user.getUserType());
                         System.out.println("Phone Number: " + user.getPhoneNumber());
                         System.out.println("Car Plate: " + user.getCarPlate());
+                        loggedIn = true;
+                        currentUser = user; // Store the logged-in user
                     } else {
                         System.out.println(response);
                     }
                 } else if (choice == 3) {
-                    // Reservation process
+                    // Encrypt and send reservation data
                     System.out.print("Enter parking spot number: ");
                     String parkingSpot = scanner.nextLine();
                     System.out.print("Enter reservation time: ");
                     String time = scanner.nextLine();
-
                     String reservationData = "ParkingSpot: " + parkingSpot + ", Time: " + time;
-                    Cipher cipher = Cipher.getInstance("AES");
+
+                    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
                     cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
+                    byte[] iv = cipher.getIV(); // Get IV
                     byte[] encryptedData = cipher.doFinal(reservationData.getBytes());
 
                     out.writeObject("reserve");
+                    out.writeObject(iv); // Send IV
                     out.writeObject(encryptedData);
+
+                    // Send the User object
+                    out.writeObject(currentUser);
 
                     // Receive encrypted response from server
                     byte[] encryptedResponse = (byte[]) in.readObject();
-                    cipher.init(Cipher.DECRYPT_MODE, sessionKey);
+                    IvParameterSpec ivSpec = new IvParameterSpec(iv);
+                    cipher.init(Cipher.DECRYPT_MODE, sessionKey, ivSpec);
                     byte[] decryptedResponse = cipher.doFinal(encryptedResponse);
-                    String responseStr = new String(decryptedResponse);
-                    System.out.println(responseStr);
-                } else if (choice == 4) {
+                    String response = new String(decryptedResponse);
+                    System.out.println(response);
+                }
+
+                else if (choice == 4) {
                     out.writeObject("close");
                     running = false;
                     LOGGER.info("Client requested to close the connection.");
                 }
+                
+                
+
             }
 
-        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | InvalidKeyException
-                | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
+        } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
         } finally {
             try {
