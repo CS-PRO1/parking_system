@@ -2,14 +2,14 @@ import java.io.*;
 import java.net.*;
 import java.security.*;
 import java.sql.*;
-import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.logging.Level;
 import javax.crypto.*;
-import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.IvParameterSpec;
 
 public class ParkingServer {
     private static final int PORT = 3000;
@@ -46,6 +46,9 @@ public class ParkingServer {
 
     static class ClientHandler implements Runnable {
         private Socket clientSocket;
+        private KeyPair serverKeyPair;
+        private PublicKey clientPublicKey;
+        private SecretKey sessionKey;
 
         public ClientHandler(Socket clientSocket) {
             this.clientSocket = clientSocket;
@@ -60,23 +63,37 @@ public class ParkingServer {
                 out = new ObjectOutputStream(clientSocket.getOutputStream());
                 in = new ObjectInputStream(clientSocket.getInputStream());
 
-                // Key exchange
-                LOGGER.info("Starting key exchange...");
-                PublicKey clientPublicKey = (PublicKey) in.readObject();
-                KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("DH");
+                // Generate server's key pair for public/private encryption
+                KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("RSA");
                 keyPairGen.initialize(2048);
-                KeyPair keyPair = keyPairGen.generateKeyPair();
-                PublicKey serverPublicKey = keyPair.getPublic();
-                PrivateKey serverPrivateKey = keyPair.getPrivate();
+                serverKeyPair = keyPairGen.generateKeyPair();
+                PublicKey serverPublicKey = serverKeyPair.getPublic();
+                PrivateKey serverPrivateKey = serverKeyPair.getPrivate();
 
+                // Send server's public key to client
                 out.writeObject(serverPublicKey);
-                LOGGER.info("Sent server public key.");
+                LOGGER.info("Sent server's public key.");
+
+                // Receive client's public key
+                clientPublicKey = (PublicKey) in.readObject();
+                LOGGER.info("Received client's public key.");
+
+                // Diffie-Hellman key exchange for session key
+                PublicKey clientDhPublicKey = (PublicKey) in.readObject();
+                KeyPairGenerator dhKeyPairGen = KeyPairGenerator.getInstance("DH");
+                dhKeyPairGen.initialize(2048);
+                KeyPair dhKeyPair = dhKeyPairGen.generateKeyPair();
+                PublicKey serverDhPublicKey = dhKeyPair.getPublic();
+                PrivateKey serverDhPrivateKey = dhKeyPair.getPrivate();
+
+                out.writeObject(serverDhPublicKey);
+                LOGGER.info("Sent server DH public key.");
 
                 KeyAgreement keyAgree = KeyAgreement.getInstance("DH");
-                keyAgree.init(serverPrivateKey);
-                keyAgree.doPhase(clientPublicKey, true);
+                keyAgree.init(serverDhPrivateKey);
+                keyAgree.doPhase(clientDhPublicKey, true);
                 byte[] sharedSecret = keyAgree.generateSecret();
-                SecretKeySpec sessionKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
+                sessionKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
                 LOGGER.info("Key exchange complete.");
                 LOGGER.info("Session Key (Server): " + bytesToHex(sessionKey.getEncoded()));
 
@@ -109,66 +126,89 @@ public class ParkingServer {
                         } else {
                             out.writeObject("Login failed. Invalid email or password.");
                         }
+                    } else if ("reserve".equals(requestType)) {
+                        byte[] iv = (byte[]) in.readObject();
+                        byte[] encryptedData = (byte[]) in.readObject();
+                        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+                        cipher.init(Cipher.DECRYPT_MODE, sessionKey, ivSpec);
+                        byte[] decryptedData = cipher.doFinal(encryptedData);
+                        String reservationData = new String(decryptedData);
+                        LOGGER.info("Received reservation data: " + reservationData);
+
+                        // Receive User object
+                        User user = (User) in.readObject();
+                        String userEmail = user.getEmail();
+                        LOGGER.info("Received User object with email: " + userEmail);
+
+                        // Parse reservation data
+                        String[] parts = reservationData.split(", ");
+                        if (parts.length == 2) {
+                            String parkingSpot = parts[0].split(": ")[1];
+                            String time = parts[1].split(": ")[1];
+
+                            LOGGER.info("Parking Spot: " + parkingSpot + ", Time: " + time + ", User Email: " + userEmail);
+
+                            // Check if spot is reserved
+                            if (isSpotReserved(parkingSpot, time)) {
+                                String response = "Spot is already reserved.";
+                                cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
+                                byte[] encryptedResponse = cipher.doFinal(response.getBytes());
+                                out.writeObject(encryptedResponse);
+                            } else {
+                                LOGGER.info("Calling reserveSpot function.");
+                                // Reserve spot
+                                boolean result = reserveSpot(userEmail, parkingSpot, time);
+                                if (result) {
+                                    String response = "Reservation confirmed!";
+                                    cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
+                                    byte[] encryptedResponse = cipher.doFinal(response.getBytes());
+                                    out.writeObject(encryptedResponse);
+                                } else {
+                                    String response = "Failed to reserve spot.";
+                                    cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
+                                    byte[] encryptedResponse = cipher.doFinal(response.getBytes());
+                                    out.writeObject(encryptedResponse);
+                                }
+                            }
+                        } else {
+                            LOGGER.warning("Reservation data format is incorrect.");
+                            String response = "Invalid reservation data format.";
+                            cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
+                            byte[] encryptedResponse = cipher.doFinal(response.getBytes());
+                            out.writeObject(encryptedResponse);
+                        }
+                    } else if ("payment".equals(requestType)) {
+                        // Receive and decrypt session key for payment
+                        byte[] encryptedSessionKey = (byte[]) in.readObject();
+                        Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+                        rsaCipher.init(Cipher.DECRYPT_MODE, serverKeyPair.getPrivate());
+                        byte[] paymentSessionKeyBytes = rsaCipher.doFinal(encryptedSessionKey);
+                        SecretKey paymentSessionKey = new SecretKeySpec(paymentSessionKeyBytes, 0, 16, "AES");
+
+                        // Receive and decrypt payment data
+                        byte[] iv = (byte[]) in.readObject();
+                        byte[] encryptedPaymentData = (byte[]) in.readObject();
+                        Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+                        aesCipher.init(Cipher.DECRYPT_MODE, paymentSessionKey, ivSpec);
+                        byte[] decryptedPaymentData = aesCipher.doFinal(encryptedPaymentData);
+                        String paymentData = new String(decryptedPaymentData);
+                        LOGGER.info("Received payment data: " + paymentData);
+
+                        // Process payment data
+                        boolean paymentSuccess = processPayment(paymentData);
+
+                        // Send confirmation
+                        String response = paymentSuccess ? "Payment successful!" : "Payment failed.";
+                        aesCipher.init(Cipher.ENCRYPT_MODE, paymentSessionKey, ivSpec);
+                        byte[] encryptedResponse = aesCipher.doFinal(response.getBytes());
+                        out.writeObject(encryptedResponse);
                     }
-                    else if ("reserve".equals(requestType)) {
-    // Receive and decrypt reservation data
-    byte[] iv = (byte[]) in.readObject(); // Receive IV
-    byte[] encryptedData = (byte[]) in.readObject();
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    IvParameterSpec ivSpec = new IvParameterSpec(iv);
-    cipher.init(Cipher.DECRYPT_MODE, sessionKey, ivSpec);
-    byte[] decryptedData = cipher.doFinal(encryptedData);
-    String reservationData = new String(decryptedData);
-    LOGGER.info("Received reservation data: " + reservationData);
-
-    // Receive User object
-    User user = (User) in.readObject();
-    String userEmail = user.getEmail();
-    LOGGER.info("Received User object with email: " + userEmail);
-
-    // Parse reservation data
-    String[] parts = reservationData.split(", ");
-    if (parts.length == 2) {
-        String parkingSpot = parts[0].split(": ")[1];
-        String time = parts[1].split(": ")[1];
-
-        LOGGER.info("Parking Spot: " + parkingSpot + ", Time: " + time + ", User Email: " + userEmail);
-
-        // Check if spot is reserved
-        if (isSpotReserved(parkingSpot, time)) {
-            String response = "Spot is already reserved.";
-            cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
-            byte[] encryptedResponse = cipher.doFinal(response.getBytes());
-            out.writeObject(encryptedResponse);
-        } else {
-            LOGGER.info("Calling reserveSpot function.");
-            // Reserve spot
-            boolean result = reserveSpot(userEmail, parkingSpot, time);
-            if (result) {
-                String response = "Reservation confirmed!";
-                cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
-                byte[] encryptedResponse = cipher.doFinal(response.getBytes());
-                out.writeObject(encryptedResponse);
-            } else {
-                String response = "Failed to reserve spot.";
-                cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
-                byte[] encryptedResponse = cipher.doFinal(response.getBytes());
-                out.writeObject(encryptedResponse);
-            }
-        }
-    } else {
-        LOGGER.warning("Reservation data format is incorrect.");
-        String response = "Invalid reservation data format.";
-        cipher.init(Cipher.ENCRYPT_MODE, sessionKey, ivSpec);
-        byte[] encryptedResponse = cipher.doFinal(response.getBytes());
-        out.writeObject(encryptedResponse);
-    }
-}
-
-
                 }
 
-            } catch (Exception e) {
+            } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | InvalidKeyException
+                    | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException | InvalidAlgorithmParameterException e) {
                 LOGGER.log(Level.SEVERE, "Error processing client request.", e);
             } finally {
                 try {
@@ -296,50 +336,29 @@ public class ParkingServer {
         }
 
         private boolean reserveSpot(String userEmail, String parkingSpot, String time) {
-            LOGGER.info("Entered reserveSpot function.");
-            if (userEmail == null || userEmail.isEmpty() || parkingSpot == null || parkingSpot.isEmpty() || time == null
-                    || time.isEmpty()) {
-                LOGGER.warning("Invalid input data for reservation.");
-                return false;
-            }
-            Connection conn = null;
-            PreparedStatement stmt = null;
-            try {
-                LOGGER.info("Establishing database connection...");
-                conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
-                LOGGER.info("Database connection established.");
-
+            LOGGER.info("Entered reserveSpot function."); // Log statement at the start
+            try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
                 String query = "INSERT INTO reservations (user_email, parking_spot, reservation_time) VALUES (?, ?, ?)";
-                stmt = conn.prepareStatement(query);
+                PreparedStatement stmt = conn.prepareStatement(query);
                 stmt.setString(1, userEmail);
                 stmt.setString(2, parkingSpot);
                 stmt.setString(3, time);
-
-                LOGGER.info("Prepared statement: " + stmt);
-                int rowsAffected = stmt.executeUpdate();
-                LOGGER.info("Rows affected: " + rowsAffected);
+                LOGGER.info("Executing query: " + stmt); // Log statement before executing query
+                stmt.executeUpdate();
                 LOGGER.info("Reservation successfully inserted.");
                 return true;
             } catch (SQLException e) {
-                LOGGER.log(Level.SEVERE, "SQL Error: " + e.getErrorCode() + " - " + e.getSQLState(), e);
+                LOGGER.log(Level.SEVERE, "Error reserving parking spot.", e);
             } catch (Exception e) {
                 LOGGER.log(Level.SEVERE, "Unexpected error.", e);
-            } finally {
-                try {
-                    if (stmt != null) {
-                        stmt.close();
-                        LOGGER.info("Statement closed.");
-                    }
-                    if (conn != null) {
-                        conn.close();
-                        LOGGER.info("Connection closed.");
-                    }
-                } catch (SQLException e) {
-                    LOGGER.log(Level.SEVERE, "Error closing resources.", e);
-                }
             }
             return false;
         }
 
+        private boolean processPayment(String paymentData) {
+            // Simulate payment processing logic
+            LOGGER.info("Processing payment: " + paymentData);
+            return true; // Assume the payment is always successful for this example
+        }
     }
 }
