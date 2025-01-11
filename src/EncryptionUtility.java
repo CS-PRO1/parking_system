@@ -1,5 +1,4 @@
 import javax.crypto.*;
-import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.IvParameterSpec;
 import java.security.*;
 import java.util.logging.Logger;

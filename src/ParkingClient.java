@@ -196,6 +196,7 @@ public class ParkingClient {
                 | InvalidAlgorithmParameterException | SignatureException e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
         }
+        scanner.close();
     }
 
     private static String bytesToHex(byte[] bytes) {
