@@ -3,79 +3,56 @@ import java.net.*;
 import java.security.*;
 import java.util.Scanner;
 import javax.crypto.*;
-import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.spec.IvParameterSpec;
-import java.util.logging.Logger;
+
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ParkingClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 3000;
     private static final Logger LOGGER = Logger.getLogger(ParkingClient.class.getName());
-
-    private static User currentUser; // Global variable to store the current user
+    private static User currentUser;
     private static PublicKey serverPublicKey;
     private static SecretKey sessionKey;
+    private static PrivateKey clientPrivateKey; // Renamed for better understanding
+    private static PublicKey clientPublicKey; // Renamed for better understanding public static
 
     public static void main(String[] args) {
-        Socket socket = null;
-        ObjectOutputStream out = null;
-        ObjectInputStream in = null;
         Scanner scanner = new Scanner(System.in);
-
-        try {
-            socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-            out = new ObjectOutputStream(socket.getOutputStream());
-            in = new ObjectInputStream(socket.getInputStream());
-
-            // Generate client's key pair for public/private encryption
-            KeyPairGenerator keyPairGen = KeyPairGenerator.getInstance("RSA");
-            keyPairGen.initialize(2048);
-            KeyPair clientKeyPair = keyPairGen.generateKeyPair();
-            PublicKey clientPublicKey = clientKeyPair.getPublic();
-            PrivateKey clientPrivateKey = clientKeyPair.getPrivate();
-
-            // Receive server's public key
+        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
+                ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
+            KeyPair clientKeyPair = KeysUtility.generateRSAKeyPair();
+            clientPublicKey = clientKeyPair.getPublic();
+            clientPrivateKey = clientKeyPair.getPrivate();
             serverPublicKey = (PublicKey) in.readObject();
             LOGGER.info("Received server's public key.");
-
-            // Send client's public key to server
             out.writeObject(clientPublicKey);
             LOGGER.info("Sent client's public key.");
-
-            // Diffie-Hellman key exchange for session key
-            KeyPairGenerator dhKeyPairGen = KeyPairGenerator.getInstance("DH");
-            dhKeyPairGen.initialize(2048);
-            KeyPair dhKeyPair = dhKeyPairGen.generateKeyPair();
+            KeyPair dhKeyPair = KeysUtility.generateDHKeyPair();
             PublicKey clientDhPublicKey = dhKeyPair.getPublic();
             PrivateKey clientDhPrivateKey = dhKeyPair.getPrivate();
-
-            // Send client's DH public key to server and receive server's DH public key
             out.writeObject(clientDhPublicKey);
             PublicKey serverDhPublicKey = (PublicKey) in.readObject();
             LOGGER.info("Received server DH public key.");
-
-            KeyAgreement keyAgree = KeyAgreement.getInstance("DH");
-            keyAgree.init(clientDhPrivateKey);
-            keyAgree.doPhase(serverDhPublicKey, true);
-            byte[] sharedSecret = keyAgree.generateSecret();
-            sessionKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
+            sessionKey = KeysUtility.generateSessionKey(clientDhPrivateKey,
+                    serverDhPublicKey);
             LOGGER.info("Key exchange complete.");
-            LOGGER.info("Session Key (Client): " + bytesToHex(sessionKey.getEncoded()));
-
+            LOGGER.info("Session Key (Client): " +
+                    bytesToHex(sessionKey.getEncoded()));
             boolean running = true;
             boolean loggedIn = false;
             while (running) {
                 if (!loggedIn) {
                     System.out.println("1. Register");
                     System.out.println("2. Login");
+                } else {
+                    System.out.println("3. Reserve");
+                    System.out.println("4. Close connection");
                 }
-                System.out.println("3. Reserve");
-                System.out.println("4. Make Payment");
-                System.out.println("5. Close connection");
                 System.out.print("Choose an option: ");
                 int choice = scanner.nextInt();
-                scanner.nextLine(); // consume newline
+                scanner.nextLine();
 
                 if (choice == 1 && !loggedIn) {
                     // Collect user registration data
@@ -181,66 +158,33 @@ public class ParkingClient {
                         System.out.println(response);
                     }
                 } else if (choice == 3) {
-                    // Encrypt and send reservation data
                     System.out.print("Enter parking spot number: ");
                     String parkingSpot = scanner.nextLine();
                     System.out.print("Enter reservation time: ");
                     String time = scanner.nextLine();
                     String reservationData = "ParkingSpot: " + parkingSpot + ", Time: " + time;
 
-                    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-                    cipher.init(Cipher.ENCRYPT_MODE, sessionKey);
-                    byte[] iv = cipher.getIV(); // Get IV
-                    byte[] encryptedData = cipher.doFinal(reservationData.getBytes());
+                    System.out.print("Enter 16-digit credit card number: ");
+                    String creditCardNumber = scanner.nextLine();
+                    System.out.print("Enter 4-digit PIN: ");
+                    String pin = scanner.nextLine();
+                    String paymentData = "CreditCardNumber: " + creditCardNumber + ", PIN: " + pin;
+
+                    byte[] encryptedData = EncryptionUtility.encrypt(reservationData, sessionKey);
+                    byte[] signature = EncryptionUtility.signData(reservationData, clientPrivateKey);
 
                     out.writeObject("reserve");
-                    out.writeObject(iv); // Send IV
                     out.writeObject(encryptedData);
-
-                    // Send the User object
+                    out.writeObject(signature); // Send the digital signature
                     out.writeObject(currentUser);
 
-                    // Receive encrypted response from server
+                    byte[] encryptedPaymentData = EncryptionUtility.encrypt(paymentData, sessionKey);
+                    out.writeObject(encryptedPaymentData);
+
                     byte[] encryptedResponse = (byte[]) in.readObject();
-                    IvParameterSpec ivSpec = new IvParameterSpec(iv);
-                    cipher.init(Cipher.DECRYPT_MODE, sessionKey, ivSpec);
-                    byte[] decryptedResponse = cipher.doFinal(encryptedResponse);
-                    String response = new String(decryptedResponse);
+                    String response = EncryptionUtility.decrypt(encryptedResponse, sessionKey);
                     System.out.println(response);
                 } else if (choice == 4) {
-                    // Simulate payment process
-                    System.out.print("Enter payment details: ");
-                    String paymentDetails = scanner.nextLine();
-
-                    // Generate session key for payment
-                    KeyGenerator keyGen = KeyGenerator.getInstance("AES");
-                    keyGen.init(128); // Use 128-bit AES for consistency
-                    SecretKey paymentSessionKey = keyGen.generateKey();
-
-                    // Encrypt session key with server's public key
-                    Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-                    rsaCipher.init(Cipher.ENCRYPT_MODE, serverPublicKey);
-                    byte[] encryptedSessionKey = rsaCipher.doFinal(paymentSessionKey.getEncoded());
-
-                    // Encrypt payment details with session key
-                    Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-                    aesCipher.init(Cipher.ENCRYPT_MODE, paymentSessionKey);
-                    byte[] iv = aesCipher.getIV(); // Get IV
-                    byte[] encryptedPaymentDetails = aesCipher.doFinal(paymentDetails.getBytes());
-
-                    out.writeObject("payment");
-                    out.writeObject(encryptedSessionKey); // Send encrypted session key
-                    out.writeObject(iv); // Send IV
-                    out.writeObject(encryptedPaymentDetails); // Send encrypted payment details
-
-                    // Receive encrypted response from server
-                    byte[] encryptedResponse = (byte[]) in.readObject();
-                    IvParameterSpec ivSpec = new IvParameterSpec(iv);
-                    aesCipher.init(Cipher.DECRYPT_MODE, paymentSessionKey, ivSpec);
-                    byte[] decryptedResponse = aesCipher.doFinal(encryptedResponse);
-                    String response = new String(decryptedResponse);
-                    System.out.println(response);
-                } else if (choice == 5) {
                     out.writeObject("close");
                     running = false;
                     LOGGER.info("Client requested to close the connection.");
@@ -249,20 +193,8 @@ public class ParkingClient {
 
         } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | InvalidKeyException
                 | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
-                | InvalidAlgorithmParameterException e) {
+                | InvalidAlgorithmParameterException | SignatureException e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
-        } finally {
-            try {
-                if (out != null)
-                    out.close();
-                if (in != null)
-                    in.close();
-                if (socket != null)
-                    socket.close();
-                scanner.close();
-            } catch (IOException e) {
-                LOGGER.log(Level.SEVERE, "Error closing resources.", e);
-            }
         }
     }
 
