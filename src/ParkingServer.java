@@ -46,7 +46,6 @@ public class ParkingServer {
                 LOGGER.info("ClientHandler started.");
                 serverKeyPair = KeysUtility.generateRSAKeyPair();
                 PublicKey serverPublicKey = serverKeyPair.getPublic();
-                // PrivateKey serverPrivateKey = serverKeyPair.getPrivate(); // Not used here
                 out.writeObject(serverPublicKey);
                 clientPublicKey = (PublicKey) in.readObject();
                 LOGGER.info("Received client's public key.");
@@ -64,21 +63,31 @@ public class ParkingServer {
                         running = false;
                     } else if ("register".equals(requestType)) {
                         User user = (User) in.readObject();
-                        String validationResult = validateUser(user);
+                        // Sanitize user data before validation or use
+                        User sanitizedUser = new User(
+                                EncryptionUtility.sanitize(user.getFullName()),
+                                EncryptionUtility.sanitize(user.getUserType()),
+                                EncryptionUtility.sanitize(user.getPhoneNumber()),
+                                EncryptionUtility.sanitize(user.getCarPlate()),
+                                EncryptionUtility.sanitize(user.getEmail()),
+                                EncryptionUtility.sanitize(user.getPassword()));
+                        String validationResult = validateUser(sanitizedUser);
                         out.writeObject(
                                 validationResult.equals("Valid")
-                                        ? new DatabaseManager().registerUser(user) ? "Registration successful!"
+                                        ? new DatabaseManager().registerUser(sanitizedUser) ? "Registration successful!"
                                                 : "Registration failed. Please try again."
                                         : validationResult);
                     } else if ("login".equals(requestType)) {
-                        out.writeObject(
-                                new DatabaseManager().loginUser((String) in.readObject(), (String) in.readObject()));
+                        // Sanitize login data
+                        String email = EncryptionUtility.sanitize((String) in.readObject());
+                        String password = EncryptionUtility.sanitize((String) in.readObject());
+                        out.writeObject(new DatabaseManager().loginUser(email, password));
                     } else if ("reserve".equals(requestType)) {
                         byte[] encryptedData = (byte[]) in.readObject();
                         byte[] signature = (byte[]) in.readObject();
                         String reservationData = EncryptionUtility.decrypt(encryptedData, sessionKey);
                         User user = (User) in.readObject();
-                        String userEmail = user.getEmail();
+                        String userEmail = EncryptionUtility.sanitize(user.getEmail());
                         if (EncryptionUtility.verifySignature(reservationData, signature, clientPublicKey)) {
                             String[] parts = reservationData.split(", ");
                             if (parts.length == 2 && new DatabaseManager().isSpotReserved(parts[0].split(": ")[1],

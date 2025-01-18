@@ -15,8 +15,8 @@ public class ParkingClient {
     private static User currentUser;
     private static PublicKey serverPublicKey;
     private static SecretKey sessionKey;
-    private static PrivateKey clientPrivateKey; // Renamed for better understanding
-    private static PublicKey clientPublicKey; // Renamed for better understanding public static
+    private static PrivateKey clientPrivateKey;
+    private static PublicKey clientPublicKey;
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
@@ -56,7 +56,7 @@ public class ParkingClient {
                 scanner.nextLine();
 
                 if (choice == 1 && !loggedIn) {
-                    // Collect user registration data
+                    // Collect and sanitize user registration data
                     String fullName;
                     String userType;
                     String phoneNumber;
@@ -65,12 +65,12 @@ public class ParkingClient {
                     String password;
 
                     System.out.print("Full Name: ");
-                    fullName = scanner.nextLine();
+                    fullName = EncryptionUtility.sanitize(scanner.nextLine());
 
                     // Validate email
                     while (true) {
                         System.out.print("Email: ");
-                        email = scanner.nextLine();
+                        email = EncryptionUtility.sanitize(scanner.nextLine());
                         if (email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$")) {
                             break;
                         } else {
@@ -81,7 +81,7 @@ public class ParkingClient {
                     // Validate user type
                     while (true) {
                         System.out.print("User Type (employee/visitor): ");
-                        userType = scanner.nextLine();
+                        userType = EncryptionUtility.sanitize(scanner.nextLine());
                         if (userType.equals("employee") || userType.equals("visitor")) {
                             break;
                         } else {
@@ -92,7 +92,7 @@ public class ParkingClient {
                     // Validate phone number
                     while (true) {
                         System.out.print("Phone Number: ");
-                        phoneNumber = scanner.nextLine();
+                        phoneNumber = EncryptionUtility.sanitize(scanner.nextLine());
                         if (phoneNumber.matches("09\\d{8}")) {
                             break;
                         } else {
@@ -103,7 +103,7 @@ public class ParkingClient {
                     // Validate car plate
                     while (true) {
                         System.out.print("Car Plate: ");
-                        carPlate = scanner.nextLine();
+                        carPlate = EncryptionUtility.sanitize(scanner.nextLine());
                         if (carPlate.matches("\\d{7}")) {
                             break;
                         } else {
@@ -114,7 +114,7 @@ public class ParkingClient {
                     // Validate password
                     while (true) {
                         System.out.print("Password: ");
-                        password = scanner.nextLine();
+                        password = EncryptionUtility.sanitize(scanner.nextLine());
                         if (password.length() >= 10) {
                             break;
                         } else {
@@ -132,11 +132,11 @@ public class ParkingClient {
                     String response = (String) in.readObject();
                     System.out.println(response);
                 } else if (choice == 2 && !loggedIn) {
-                    // Collect login data
+                    // Collect and sanitize login data
                     System.out.print("Email: ");
-                    String email = scanner.nextLine();
+                    String email = EncryptionUtility.sanitize(scanner.nextLine());
                     System.out.print("Password: ");
-                    String password = scanner.nextLine();
+                    String password = EncryptionUtility.sanitize(scanner.nextLine());
 
                     // Send login request to server
                     out.writeObject("login");
@@ -159,17 +159,18 @@ public class ParkingClient {
                         System.out.println(response);
                     }
                 } else if (choice == 3) {
+                    // Sanitize reservation data
                     System.out.print("Enter parking spot number: ");
-                    String parkingSpot = scanner.nextLine();
+                    String parkingSpot = EncryptionUtility.sanitize(scanner.nextLine());
                     System.out.print("Enter reservation time: ");
-                    String time = scanner.nextLine();
+                    String time = EncryptionUtility.sanitize(scanner.nextLine());
                     String reservationData = "ParkingSpot: " + parkingSpot + ", Time: " + time;
 
                     String creditCardNumber;
-                    // Validate Credit Card
+                    // Validate and sanitize Credit Card
                     while (true) {
                         System.out.print("Enter 16-digit credit card number: ");
-                        creditCardNumber = scanner.nextLine();
+                        creditCardNumber = EncryptionUtility.sanitize(scanner.nextLine());
                         if (creditCardNumber.matches("\\d{16}")) {
                             break;
                         } else {
@@ -180,7 +181,7 @@ public class ParkingClient {
                     String pin;
                     while (true) {
                         System.out.print("Enter 4-digit PIN: ");
-                        pin = scanner.nextLine();
+                        pin = EncryptionUtility.sanitize(scanner.nextLine());
                         if (pin.matches("\\d{4}")) {
                             break;
                         } else {
@@ -210,9 +211,7 @@ public class ParkingClient {
                 }
             }
 
-        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | InvalidKeyException
-                | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
-                | InvalidAlgorithmParameterException | SignatureException e) {
+        } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
         }
         scanner.close();
