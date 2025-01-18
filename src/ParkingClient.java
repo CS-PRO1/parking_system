@@ -7,6 +7,7 @@ import javax.crypto.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@SuppressWarnings("unused")
 public class ParkingClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 3000;
@@ -214,6 +215,7 @@ public class ParkingClient {
                 | InvalidAlgorithmParameterException | SignatureException e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
         }
+        scanner.close();
     }
 
     private static String bytesToHex(byte[] bytes) {
