@@ -5,6 +5,7 @@ import java.net.*;
 import java.security.*;
 import javax.crypto.*;
 
+import Utilities.EncryptionUtility;
 import Utilities.KeysUtility;
 import Utilities.UserModel;
 
@@ -44,7 +45,7 @@ public class ParkingClient {
                     serverDhPublicKey);
             LOGGER.info("Key exchange complete.");
             LOGGER.info("Session Key (Client): " +
-                    bytesToHex(sessionKey.getEncoded()));
+                    EncryptionUtility.bytesToHex(sessionKey.getEncoded()));
 
             ClientOperations ops = new ClientOperations(sessionKey, clientPrivateKey, uiModule);
             boolean running = true;
@@ -83,11 +84,5 @@ public class ParkingClient {
         }
     }
 
-    private static String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
+
 }
