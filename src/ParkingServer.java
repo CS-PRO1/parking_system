@@ -52,7 +52,6 @@ public class ParkingServer {
                 LOGGER.info("ClientHandler started.");
                 serverKeyPair = KeysUtility.generateRSAKeyPair();
                 PublicKey serverPublicKey = serverKeyPair.getPublic();
-                PrivateKey serverPrivateKey = serverKeyPair.getPrivate();
                 out.writeObject(serverPublicKey);
                 clientPublicKey = (PublicKey) in.readObject();
                 LOGGER.info("Received client's public key.");

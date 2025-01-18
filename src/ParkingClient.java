@@ -12,7 +12,6 @@ public class ParkingClient {
     private static final int SERVER_PORT = 3000;
     private static final Logger LOGGER = Logger.getLogger(ParkingClient.class.getName());
     private static User currentUser;
-    private static PublicKey serverPublicKey;
     private static SecretKey sessionKey;
     private static PrivateKey clientPrivateKey; // Renamed for better understanding
     private static PublicKey clientPublicKey; // Renamed for better understanding public static
@@ -191,9 +190,7 @@ public class ParkingClient {
                 }
             }
 
-        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | InvalidKeyException
-                | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
-                | InvalidAlgorithmParameterException | SignatureException e) {
+        } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
         }
         scanner.close();
