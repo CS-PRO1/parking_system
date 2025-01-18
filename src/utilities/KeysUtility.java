@@ -1,5 +1,3 @@
-package utilities;
-
 import java.security.*;
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
