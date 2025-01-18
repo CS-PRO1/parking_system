@@ -164,10 +164,28 @@ public class ParkingClient {
                     String time = scanner.nextLine();
                     String reservationData = "ParkingSpot: " + parkingSpot + ", Time: " + time;
 
-                    System.out.print("Enter 16-digit credit card number: ");
-                    String creditCardNumber = scanner.nextLine();
-                    System.out.print("Enter 4-digit PIN: ");
-                    String pin = scanner.nextLine();
+                    String creditCardNumber;
+                    // Validate Credit Card
+                    while (true) {
+                        System.out.print("Enter 16-digit credit card number: ");
+                        creditCardNumber = scanner.nextLine();
+                        if (creditCardNumber.matches("\\d{16}")) {
+                            break;
+                        } else {
+                            System.out.println("Card number must be a 16-digit number.");
+                        }
+                    }
+
+                    String pin;
+                    while (true) {
+                        System.out.print("Enter 4-digit PIN: ");
+                        pin = scanner.nextLine();
+                        if (pin.matches("\\d{4}")) {
+                            break;
+                        } else {
+                            System.out.println("PIN must be a 4-digit number.");
+                        }
+                    }
                     String paymentData = "CreditCardNumber: " + creditCardNumber + ", PIN: " + pin;
 
                     byte[] encryptedData = EncryptionUtility.encrypt(reservationData, sessionKey);
@@ -196,7 +214,6 @@ public class ParkingClient {
                 | InvalidAlgorithmParameterException | SignatureException e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
         }
-        scanner.close();
     }
 
     private static String bytesToHex(byte[] bytes) {

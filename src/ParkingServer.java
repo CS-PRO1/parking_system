@@ -8,7 +8,8 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.logging.Level;
 import javax.crypto.*;
-
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.IvParameterSpec;
 
 public class ParkingServer {
     private static final int PORT = 3000;
