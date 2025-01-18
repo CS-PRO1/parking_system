@@ -1,11 +1,48 @@
 package Client;
+
+import java.io.*;
 import java.util.Scanner;
+import java.util.logging.Logger;
+
+import Utilities.UserModel;
 
 public class UserInputModule {
     private Scanner scanner;
 
     public UserInputModule() {
         this.scanner = new Scanner(System.in);
+    }
+
+    public void handleUserInput(UserModel currentUser, ClientOperations ops,
+            ObjectOutputStream out, ObjectInputStream in, Logger LOGGER) throws Exception {
+        boolean running = true;
+        boolean loggedIn = false;
+        while (running) {
+            int choice = loggedIn ? this.getMenuChoice("Reserve", "Close connection")
+                    : this.getMenuChoice("Login", "Register", "Close connection");
+
+            if (choice == 1 && !loggedIn) {
+                UserModel loggedInUser = ops.handleLogin(out, in);
+                if (loggedInUser != null) {
+                    loggedIn = true;
+                    currentUser = loggedInUser;
+                    ops.setCurrentUser(currentUser);
+                }
+            } else if (choice == 2 && !loggedIn) {
+                UserModel newUser = ops.handleRegistration(out, in);
+                if (newUser != null) {
+                    loggedIn = true;
+                    currentUser = newUser;
+                    ops.setCurrentUser(currentUser);
+                }
+            } else if (choice == 1 && loggedIn) {
+                ops.handleReservation(out, in);
+            } else if ((choice == 2 && loggedIn) || (choice == 3 && !loggedIn)) {
+                out.writeObject("close");
+                running = false;
+                LOGGER.info("Client requested to close the connection.");
+            }
+        }
     }
 
     // General string input

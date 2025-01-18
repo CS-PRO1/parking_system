@@ -18,64 +18,22 @@ public class ParkingClient {
     private static final int SERVER_PORT = 3000;
     private static final Logger LOGGER = Logger.getLogger(ParkingClient.class.getName());
     private static UserModel currentUser;
-    private static PublicKey serverPublicKey;
-    private static SecretKey sessionKey;
-    private static PrivateKey clientPrivateKey;
-    private static PublicKey clientPublicKey;
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
         UserInputModule uiModule = new UserInputModule();
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-            KeyPair clientKeyPair = KeysUtility.generateRSAKeyPair();
-            clientPublicKey = clientKeyPair.getPublic();
-            clientPrivateKey = clientKeyPair.getPrivate();
-            serverPublicKey = (PublicKey) in.readObject();
-            LOGGER.info("Received server's public key.");
-            out.writeObject(clientPublicKey);
-            LOGGER.info("Sent client's public key.");
-            KeyPair dhKeyPair = KeysUtility.generateDHKeyPair();
-            PublicKey clientDhPublicKey = dhKeyPair.getPublic();
-            PrivateKey clientDhPrivateKey = dhKeyPair.getPrivate();
-            out.writeObject(clientDhPublicKey);
-            PublicKey serverDhPublicKey = (PublicKey) in.readObject();
-            LOGGER.info("Received server DH public key.");
-            sessionKey = KeysUtility.generateSessionKey(clientDhPrivateKey,
-                    serverDhPublicKey);
-            LOGGER.info("Key exchange complete.");
-            LOGGER.info("Session Key (Client): " +
-                    EncryptionUtility.bytesToHex(sessionKey.getEncoded()));
 
-            ClientOperations ops = new ClientOperations(sessionKey, clientPrivateKey, uiModule);
-            boolean running = true;
-            boolean loggedIn = false;
-            while (running) {
-                int choice = loggedIn ? uiModule.getMenuChoice("Reserve", "Close connection")
-                        : uiModule.getMenuChoice("Login", "Register", "Close connection");
+            KeyExchangeModule keyExchange = new KeyExchangeModule();
+            keyExchange.performKeyExchange(socket, out, in);
 
-                if (choice == 1 && !loggedIn) {
-                    UserModel loggedInUser = ops.handleLogin(out, in);
-                    if (loggedInUser != null) {
-                        loggedIn = true;
-                        currentUser = loggedInUser;
-                        ops.setCurrentUser(currentUser);
-                    }
-                } else if (choice == 2 && !loggedIn) {
-                    UserModel newUser = ops.handleRegistration(out, in);
-                    if (newUser != null) {
-                        loggedIn = true;
-                        currentUser = newUser;
-                        ops.setCurrentUser(currentUser);
-                    }
-                } else if (choice == 1 && loggedIn) {
-                    ops.handleReservation(out, in);
-                } else if ((choice == 2 && loggedIn) || (choice == 3 && !loggedIn)) {
-                    out.writeObject("close");
-                    running = false;
-                    LOGGER.info("Client requested to close the connection.");
-                }
-            }
+            ClientOperations ops = new ClientOperations(
+                    keyExchange.getSessionKey(),
+                    keyExchange.getClientPrivateKey(),
+                    uiModule);
+
+            uiModule.handleUserInput(currentUser, ops, out, in, LOGGER);
 
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
@@ -83,6 +41,4 @@ public class ParkingClient {
             uiModule.close();
         }
     }
-
-
 }
