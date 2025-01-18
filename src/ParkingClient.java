@@ -4,6 +4,9 @@ import java.security.*;
 import java.util.Scanner;
 import javax.crypto.*;
 
+import utilities.EncryptionUtility;
+import utilities.KeysUtility;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,7 +27,6 @@ public class ParkingClient {
             KeyPair clientKeyPair = KeysUtility.generateRSAKeyPair();
             clientPublicKey = clientKeyPair.getPublic();
             clientPrivateKey = clientKeyPair.getPrivate();
-            serverPublicKey = (PublicKey) in.readObject();
             LOGGER.info("Received server's public key.");
             out.writeObject(clientPublicKey);
             LOGGER.info("Sent client's public key.");
