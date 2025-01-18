@@ -1,3 +1,4 @@
+package Utilities;
 import java.sql.*;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -8,7 +9,7 @@ public class DatabaseManager {
     private static final String DB_PASSWORD = "password";
     private static final Logger LOGGER = Logger.getLogger(DatabaseManager.class.getName());
 
-    public boolean registerUser(User user) {
+    public boolean registerUser(UserModel user) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "INSERT INTO users (full_name, user_type, phone_number, car_plate, email, password) VALUES (?, ?, ?, ?, ?, ?)";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -27,7 +28,7 @@ public class DatabaseManager {
         }
     }
 
-    public User loginUser(String email, String password) {
+    public UserModel loginUser(String email, String password) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "SELECT * FROM users WHERE email = ? AND password = ?";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -35,7 +36,7 @@ public class DatabaseManager {
                 stmt.setString(2, password);
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
-                        return new User(
+                        return new UserModel(
                                 rs.getString("full_name"),
                                 rs.getString("user_type"),
                                 rs.getString("phone_number"),

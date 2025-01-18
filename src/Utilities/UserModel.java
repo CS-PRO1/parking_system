@@ -1,6 +1,7 @@
+package Utilities;
 import java.io.Serializable;
 
-public class User implements Serializable {
+public class UserModel implements Serializable {
     private String fullName;
     private String userType;
     private String phoneNumber;
@@ -8,7 +9,7 @@ public class User implements Serializable {
     private String email;
     private String password;
 
-    public User(String fullName, String userType, String phoneNumber, String carPlate, String email, String password) {
+    public UserModel(String fullName, String userType, String phoneNumber, String carPlate, String email, String password) {
         this.fullName = fullName;
         this.userType = userType;
         this.phoneNumber = phoneNumber;

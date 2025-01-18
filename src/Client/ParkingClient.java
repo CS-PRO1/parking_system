@@ -1,7 +1,12 @@
+package Client;
 import java.io.*;
 import java.net.*;
 import java.security.*;
 import javax.crypto.*;
+
+import Utilities.EncryptionUtility;
+import Utilities.KeysUtility;
+import Utilities.UserModel;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -11,7 +16,7 @@ public class ParkingClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 3000;
     private static final Logger LOGGER = Logger.getLogger(ParkingClient.class.getName());
-    private static User currentUser;
+    private static UserModel currentUser;
     private static PublicKey serverPublicKey;
     private static SecretKey sessionKey;
     private static PrivateKey clientPrivateKey;
@@ -49,23 +54,23 @@ public class ParkingClient {
                 if (choice == 1 && !loggedIn) {
                     String fullName = uiModule.getStringInput("Full Name: ");
                     String email = uiModule.getValidatedEmail("Email: ");
-                    String userType = uiModule.getValidatedUserType("User Type (employee/visitor): ");
+                    String userType = uiModule.getValidatedUserType("UserModel Type (employee/visitor): ");
                     String phoneNumber = uiModule.getValidatedPhoneNumber("Phone Number: ");
                     String carPlate = uiModule.getValidatedCarPlate("Car Plate: ");
                     String password = uiModule.getValidatedPassword("Password: ");
 
-                    User user = new User(fullName, userType, phoneNumber, carPlate, email, password);
+                    UserModel user = new UserModel(fullName, userType, phoneNumber, carPlate, email, password);
 
                     out.writeObject("register");
                     out.writeObject(user);
 
                     Object response = in.readObject();
-                    if (response instanceof User) {
-                        User registeredUser = (User) response;
+                    if (response instanceof UserModel) {
+                        UserModel registeredUser = (UserModel) response;
                         System.out.println("Registration and login successful!");
                         System.out.println("Email: " + registeredUser.getEmail());
                         System.out.println("Full Name: " + registeredUser.getFullName());
-                        System.out.println("User Type: " + registeredUser.getUserType());
+                        System.out.println("UserModel Type: " + registeredUser.getUserType());
                         System.out.println("Phone Number: " + registeredUser.getPhoneNumber());
                         System.out.println("Car Plate: " + registeredUser.getCarPlate());
                         loggedIn = true;
@@ -82,12 +87,12 @@ public class ParkingClient {
                     out.writeObject(password);
 
                     Object response = in.readObject();
-                    if (response instanceof User) {
-                        User loggedInUser = (User) response;
+                    if (response instanceof UserModel) {
+                        UserModel loggedInUser = (UserModel) response;
                         System.out.println("Login successful!");
                         System.out.println("Email: " + loggedInUser.getEmail());
                         System.out.println("Full Name: " + loggedInUser.getFullName());
-                        System.out.println("User Type: " + loggedInUser.getUserType());
+                        System.out.println("UserModel Type: " + loggedInUser.getUserType());
                         System.out.println("Phone Number: " + loggedInUser.getPhoneNumber());
                         System.out.println("Car Plate: " + loggedInUser.getCarPlate());
                         loggedIn = true;
