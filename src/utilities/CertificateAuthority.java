@@ -1,8 +1,8 @@
-package com.parking.reservation.ca;
+package utilities;
 
 import java.security.*;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import javax.crypto.Cipher;
 import java.util.logging.Logger;
 
 public class CertificateAuthority {
@@ -13,6 +13,7 @@ public class CertificateAuthority {
     public CertificateAuthority() {
         try {
             caKeyPair = generateCAKeyPair();
+            LOGGER.info("CA Key Pair generated.");
         } catch (NoSuchAlgorithmException e) {
             LOGGER.severe("Failed to generate CA KeyPair: " + e.getMessage());
         }
@@ -27,20 +28,21 @@ public class CertificateAuthority {
     public String signCSR(String csr) throws GeneralSecurityException {
         Signature signature = Signature.getInstance("SHA256withRSA");
         signature.initSign(caKeyPair.getPrivate());
-        signature.update(csr.getBytes());
+        signature.update(Base64.getDecoder().decode(csr)); // Decode the Base64 string back to bytes
 
-        String signedCSR = Base64.getEncoder().encodeToString(signature.sign());
-        LOGGER.info("CSR signed by CA.");
-        return signedCSR;
+        byte[] signatureBytes = signature.sign();
+        return Base64.getEncoder().encodeToString(signatureBytes);
     }
 
-    public boolean verifyCertificate(String csr, String clientPublicKeyBase64) throws GeneralSecurityException {
-        PublicKey clientPublicKey = loadClientPublicKey(clientPublicKeyBase64);
+    public boolean verifyCertificate(String signedCSR, PublicKey clientPublicKey) throws GeneralSecurityException {
+        LOGGER.info("Verifying certificate with CA public key.");
+        LOGGER.info("Received signed certificate: " + signedCSR);
+
         Signature signature = Signature.getInstance("SHA256withRSA");
         signature.initVerify(caKeyPair.getPublic());
-        signature.update(csr.getBytes());
+        signature.update(clientPublicKey.getEncoded()); // Update with the public key bytes
 
-        boolean isValid = signature.verify(Base64.getDecoder().decode(csr));
+        boolean isValid = signature.verify(Base64.getDecoder().decode(signedCSR));
         LOGGER.info("Certificate verification result: " + isValid);
         return isValid;
     }
