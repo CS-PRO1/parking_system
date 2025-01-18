@@ -1,7 +1,6 @@
 import java.io.*;
 import java.net.*;
 import java.security.*;
-import java.util.Scanner;
 import javax.crypto.*;
 
 import java.util.logging.Level;
@@ -19,7 +18,7 @@ public class ParkingClient {
     private static PublicKey clientPublicKey;
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
+        UserInputModule uiModule = new UserInputModule();
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
@@ -44,150 +43,65 @@ public class ParkingClient {
             boolean running = true;
             boolean loggedIn = false;
             while (running) {
-                if (!loggedIn) {
-                    System.out.println("1. Register");
-                    System.out.println("2. Login");
-                } else {
-                    System.out.println("3. Reserve");
-                    System.out.println("4. Close connection");
-                }
-                System.out.print("Choose an option: ");
-                int choice = scanner.nextInt();
-                scanner.nextLine();
+                int choice = loggedIn ? uiModule.getMenuChoice("Reserve", "Close connection")
+                        : uiModule.getMenuChoice("Register", "Login");
 
                 if (choice == 1 && !loggedIn) {
-                    // Collect and sanitize user registration data
-                    String fullName;
-                    String userType;
-                    String phoneNumber;
-                    String carPlate;
-                    String email;
-                    String password;
-
-                    System.out.print("Full Name: ");
-                    fullName = EncryptionUtility.sanitize(scanner.nextLine());
-
-                    // Validate email
-                    while (true) {
-                        System.out.print("Email: ");
-                        email = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$")) {
-                            break;
-                        } else {
-                            System.out.println("Email is not in a valid format.");
-                        }
-                    }
-
-                    // Validate user type
-                    while (true) {
-                        System.out.print("User Type (employee/visitor): ");
-                        userType = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (userType.equals("employee") || userType.equals("visitor")) {
-                            break;
-                        } else {
-                            System.out.println("Invalid user type. Please enter 'employee' or 'visitor'.");
-                        }
-                    }
-
-                    // Validate phone number
-                    while (true) {
-                        System.out.print("Phone Number: ");
-                        phoneNumber = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (phoneNumber.matches("09\\d{8}")) {
-                            break;
-                        } else {
-                            System.out.println("Phone number must be 10 digits and start with 09.");
-                        }
-                    }
-
-                    // Validate car plate
-                    while (true) {
-                        System.out.print("Car Plate: ");
-                        carPlate = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (carPlate.matches("\\d{7}")) {
-                            break;
-                        } else {
-                            System.out.println("Car plate must be a 7-digit number.");
-                        }
-                    }
-
-                    // Validate password
-                    while (true) {
-                        System.out.print("Password: ");
-                        password = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (password.length() >= 10) {
-                            break;
-                        } else {
-                            System.out.println("Password must be at least 10 characters long.");
-                        }
-                    }
+                    String fullName = uiModule.getStringInput("Full Name: ");
+                    String email = uiModule.getValidatedEmail("Email: ");
+                    String userType = uiModule.getValidatedUserType("User Type (employee/visitor): ");
+                    String phoneNumber = uiModule.getValidatedPhoneNumber("Phone Number: ");
+                    String carPlate = uiModule.getValidatedCarPlate("Car Plate: ");
+                    String password = uiModule.getValidatedPassword("Password: ");
 
                     User user = new User(fullName, userType, phoneNumber, carPlate, email, password);
 
-                    // Send registration request to server
                     out.writeObject("register");
                     out.writeObject(user);
 
-                    // Receive response from server
-                    String response = (String) in.readObject();
-                    System.out.println(response);
+                    Object response = in.readObject();
+                    if (response instanceof User) {
+                        User registeredUser = (User) response;
+                        System.out.println("Registration and login successful!");
+                        System.out.println("Email: " + registeredUser.getEmail());
+                        System.out.println("Full Name: " + registeredUser.getFullName());
+                        System.out.println("User Type: " + registeredUser.getUserType());
+                        System.out.println("Phone Number: " + registeredUser.getPhoneNumber());
+                        System.out.println("Car Plate: " + registeredUser.getCarPlate());
+                        loggedIn = true;
+                        currentUser = registeredUser; // Store the logged-in user
+                    } else {
+                        System.out.println(response);
+                    }
                 } else if (choice == 2 && !loggedIn) {
-                    // Collect and sanitize login data
-                    System.out.print("Email: ");
-                    String email = EncryptionUtility.sanitize(scanner.nextLine());
-                    System.out.print("Password: ");
-                    String password = EncryptionUtility.sanitize(scanner.nextLine());
+                    String email = uiModule.getValidatedEmail("Email: ");
+                    String password = uiModule.getValidatedPassword("Password: ");
 
-                    // Send login request to server
                     out.writeObject("login");
                     out.writeObject(email);
                     out.writeObject(password);
 
-                    // Receive response from server
                     Object response = in.readObject();
                     if (response instanceof User) {
-                        User user = (User) response;
+                        User loggedInUser = (User) response;
                         System.out.println("Login successful!");
-                        System.out.println("Email: " + user.getEmail());
-                        System.out.println("Full Name: " + user.getFullName());
-                        System.out.println("User Type: " + user.getUserType());
-                        System.out.println("Phone Number: " + user.getPhoneNumber());
-                        System.out.println("Car Plate: " + user.getCarPlate());
+                        System.out.println("Email: " + loggedInUser.getEmail());
+                        System.out.println("Full Name: " + loggedInUser.getFullName());
+                        System.out.println("User Type: " + loggedInUser.getUserType());
+                        System.out.println("Phone Number: " + loggedInUser.getPhoneNumber());
+                        System.out.println("Car Plate: " + loggedInUser.getCarPlate());
                         loggedIn = true;
-                        currentUser = user; // Store the logged-in user
+                        currentUser = loggedInUser; // Store the logged-in user
                     } else {
                         System.out.println(response);
                     }
-                } else if (choice == 3) {
-                    // Sanitize reservation data
-                    System.out.print("Enter parking spot number: ");
-                    String parkingSpot = EncryptionUtility.sanitize(scanner.nextLine());
-                    System.out.print("Enter reservation time: ");
-                    String time = EncryptionUtility.sanitize(scanner.nextLine());
+                } else if (choice == 1 && loggedIn) {
+                    String parkingSpot = uiModule.getStringInput("Enter parking spot number: ");
+                    String time = uiModule.getStringInput("Enter reservation time: ");
                     String reservationData = "ParkingSpot: " + parkingSpot + ", Time: " + time;
 
-                    String creditCardNumber;
-                    // Validate and sanitize Credit Card
-                    while (true) {
-                        System.out.print("Enter 16-digit credit card number: ");
-                        creditCardNumber = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (creditCardNumber.matches("\\d{16}")) {
-                            break;
-                        } else {
-                            System.out.println("Card number must be a 16-digit number.");
-                        }
-                    }
-
-                    String pin;
-                    while (true) {
-                        System.out.print("Enter 4-digit PIN: ");
-                        pin = EncryptionUtility.sanitize(scanner.nextLine());
-                        if (pin.matches("\\d{4}")) {
-                            break;
-                        } else {
-                            System.out.println("PIN must be a 4-digit number.");
-                        }
-                    }
+                    String creditCardNumber = uiModule.getValidatedCreditCard("Enter 16-digit credit card number: ");
+                    String pin = uiModule.getValidatedPIN("Enter 4-digit PIN: ");
                     String paymentData = "CreditCardNumber: " + creditCardNumber + ", PIN: " + pin;
 
                     byte[] encryptedData = EncryptionUtility.encrypt(reservationData, sessionKey);
@@ -204,17 +118,20 @@ public class ParkingClient {
                     byte[] encryptedResponse = (byte[]) in.readObject();
                     String response = EncryptionUtility.decrypt(encryptedResponse, sessionKey);
                     System.out.println(response);
-                } else if (choice == 4) {
+                } else if (choice == 2 && loggedIn) {
                     out.writeObject("close");
                     running = false;
                     LOGGER.info("Client requested to close the connection.");
                 }
             }
 
-        } catch (Exception e) {
+        } catch (IOException | ClassNotFoundException | NoSuchAlgorithmException | InvalidKeyException
+                | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException
+                | InvalidAlgorithmParameterException | SignatureException e) {
             LOGGER.log(Level.SEVERE, "Error in client operation.", e);
+        } finally {
+            uiModule.close();
         }
-        scanner.close();
     }
 
     private static String bytesToHex(byte[] bytes) {

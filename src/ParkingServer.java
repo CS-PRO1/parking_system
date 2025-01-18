@@ -63,7 +63,6 @@ public class ParkingServer {
                         running = false;
                     } else if ("register".equals(requestType)) {
                         User user = (User) in.readObject();
-                        // Sanitize user data before validation or use
                         User sanitizedUser = new User(
                                 EncryptionUtility.sanitize(user.getFullName()),
                                 EncryptionUtility.sanitize(user.getUserType()),
@@ -72,13 +71,27 @@ public class ParkingServer {
                                 EncryptionUtility.sanitize(user.getEmail()),
                                 EncryptionUtility.sanitize(user.getPassword()));
                         String validationResult = validateUser(sanitizedUser);
-                        out.writeObject(
-                                validationResult.equals("Valid")
-                                        ? new DatabaseManager().registerUser(sanitizedUser) ? "Registration successful!"
-                                                : "Registration failed. Please try again."
-                                        : validationResult);
+                        if (validationResult.equals("Valid")) {
+                            boolean registrationSuccess = new DatabaseManager().registerUser(sanitizedUser);
+                            if (registrationSuccess) {
+                                // Automatically log in the user
+                                User loggedInUser = new DatabaseManager().loginUser(sanitizedUser.getEmail(),
+                                        sanitizedUser.getPassword());
+                                if (loggedInUser != null) {
+                                    out.writeObject(loggedInUser); // Send the user object back to indicate successful
+                                                                   // login
+                                    LOGGER.info(
+                                            "User registered and automatically logged in: " + sanitizedUser.getEmail());
+                                } else {
+                                    out.writeObject("Login failed after registration. Please try to login manually.");
+                                }
+                            } else {
+                                out.writeObject("Registration failed. Please try again.");
+                            }
+                        } else {
+                            out.writeObject(validationResult);
+                        }
                     } else if ("login".equals(requestType)) {
-                        // Sanitize login data
                         String email = EncryptionUtility.sanitize((String) in.readObject());
                         String password = EncryptionUtility.sanitize((String) in.readObject());
                         out.writeObject(new DatabaseManager().loginUser(email, password));
