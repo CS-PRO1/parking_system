@@ -1,4 +1,5 @@
 package Utilities;
+
 import java.io.Serializable;
 
 public class UserModel implements Serializable {
@@ -9,7 +10,8 @@ public class UserModel implements Serializable {
     private String email;
     private String password;
 
-    public UserModel(String fullName, String userType, String phoneNumber, String carPlate, String email, String password) {
+    public UserModel(String fullName, String userType, String phoneNumber, String carPlate, String email,
+            String password) {
         this.fullName = fullName;
         this.userType = userType;
         this.phoneNumber = phoneNumber;
@@ -40,5 +42,11 @@ public class UserModel implements Serializable {
 
     public String getPassword() {
         return password;
+    }
+
+    public void printUser() {
+        System.out.println("Name: " + this.fullName);
+        System.out.println("Email: " + this.email);
+        System.out.println("Phone Number: " + this.phoneNumber);
     }
 }

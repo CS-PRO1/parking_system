@@ -19,6 +19,7 @@ public class ClientOperations {
         this.uiModule = uiModule;
     }
 
+    // Handles new user registration process after validating each input
     public UserModel handleRegistration(ObjectOutputStream out, ObjectInputStream in) throws Exception {
         String fullName = uiModule.getStringInput("Full Name: ");
         String email = uiModule.getValidatedEmail("Email: ");
@@ -48,6 +49,7 @@ public class ClientOperations {
         }
     }
 
+    // Handles Login procedure
     public UserModel handleLogin(ObjectOutputStream out, ObjectInputStream in) throws Exception {
         String email = uiModule.getValidatedEmail("Email: ");
         String password = uiModule.getValidatedPassword("Password: ");
@@ -71,7 +73,7 @@ public class ClientOperations {
             return null;
         }
     }
-
+//Handles the reservation request and validates inputs
     public void handleReservation(ObjectOutputStream out, ObjectInputStream in) throws Exception {
         String parkingSpot = uiModule.getStringInput("Enter parking spot number: ");
         String time = uiModule.getStringInput("Enter reservation time: ");

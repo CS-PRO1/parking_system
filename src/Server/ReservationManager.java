@@ -8,13 +8,11 @@ import Utilities.UserModel;
 
 import java.security.*;
 
-
 public class ReservationManager {
-
+    // Receives the reservation request and attempts to verify and execute it
     public byte[] handleReservation(String reservationData, String paymentData, UserModel user, SecretKey sessionKey,
             PublicKey clientPublicKey, byte[] signature)
-            throws NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException, IllegalBlockSizeException,
-            BadPaddingException, InvalidAlgorithmParameterException, SignatureException {
+            throws Exception {
         String userEmail = user.getEmail();
         if (EncryptionUtility.verifySignature(reservationData, signature, clientPublicKey)) {
             String[] parts = reservationData.split(", ");
@@ -28,7 +26,7 @@ public class ReservationManager {
                                 paymentParts[1].split(": ")[1])
                         &&
                         new DatabaseManager().reserveSpot(userEmail, parts[0].split(": ")[1], parts[1].split(": ")[1]);
-                new DatabaseManager().logActivity(userEmail, reservationData, bytesToHex(signature));
+                new DatabaseManager().logActivity(userEmail, reservationData, EncryptionUtility.bytesToHex(signature));
                 return EncryptionUtility.encrypt(
                         success ? "Reservation and payment successful!" : "Failed to reserve spot or process payment.",
                         sessionKey);
@@ -38,11 +36,4 @@ public class ReservationManager {
         }
     }
 
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
-    }
 }

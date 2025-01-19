@@ -1,4 +1,5 @@
 package Server;
+
 import java.io.*;
 import java.net.*;
 import java.util.concurrent.Executors;
@@ -13,12 +14,14 @@ public class ParkingServer {
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             LOGGER.info("Parking Server is running on port " + PORT);
+            // Thread pool to set how many clients can be handled at once
             ExecutorService executor = Executors.newFixedThreadPool(10);
 
+            // Execution loop
             while (true) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-                    executor.execute(() -> new ClientHandler(clientSocket).handle());
+                    executor.execute(() -> new ClientHandler(clientSocket).initializeHandler());
                 } catch (IOException e) {
                     LOGGER.log(Level.SEVERE, "Error accepting client connection.", e);
                 }

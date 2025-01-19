@@ -8,6 +8,8 @@ import java.util.logging.Logger;
 public class EncryptionUtility {
     private static final Logger LOGGER = Logger.getLogger(EncryptionUtility.class.getName());
 
+    // Encryption Method
+    // Encrypts the given data using AES encryption with CBC mode and PKCS5 padding.
     public static byte[] encrypt(String data, SecretKey key) throws NoSuchAlgorithmException, NoSuchPaddingException,
             InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
@@ -18,6 +20,8 @@ public class EncryptionUtility {
         return concatenate(iv, encryptedData);
     }
 
+    // Decryption Method
+    // Decrypts data that was encrypted with AES encryption.
     public static String decrypt(byte[] encryptedData, SecretKey key)
             throws NoSuchAlgorithmException, NoSuchPaddingException,
             InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException {
@@ -34,6 +38,7 @@ public class EncryptionUtility {
         return new String(decryptedData);
     }
 
+    // Concatenates the IV and encrypted data into one byte array.
     private static byte[] concatenate(byte[] iv, byte[] encryptedData) {
         byte[] result = new byte[iv.length + encryptedData.length];
         System.arraycopy(iv, 0, result, 0, iv.length);
@@ -41,6 +46,7 @@ public class EncryptionUtility {
         return result;
     }
 
+    // Signs the given data with a private key using SHA256withRSA algorithm.
     public static byte[] signData(String data, PrivateKey privateKey)
             throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         Signature signature = Signature.getInstance("SHA256withRSA");
@@ -49,6 +55,7 @@ public class EncryptionUtility {
         return signature.sign();
     }
 
+    // Verifies the signature of the data using the public key.
     public static boolean verifySignature(String data, byte[] signatureBytes, PublicKey publicKey)
             throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
         Signature signature = Signature.getInstance("SHA256withRSA");
@@ -57,6 +64,7 @@ public class EncryptionUtility {
         return signature.verify(signatureBytes);
     }
 
+    // Santizies all inputs to prevent SQLI and XSS attacks
     public static String sanitize(String input) {
         if (input == null) {
             return null;
@@ -68,6 +76,8 @@ public class EncryptionUtility {
                 .replaceAll("'", "&#x27;");
     }
 
+    // Covnerts bytes to Hex String
+    // Used to store the signature in the Activity log in the DB
     public static String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {

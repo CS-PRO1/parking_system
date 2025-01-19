@@ -24,7 +24,9 @@ public class ClientHandler {
         this.clientSocket = clientSocket;
     }
 
-    public void handle() {
+    // Method to initialize the I/O streams and key handshake and begin receiving
+    // requests and finally shutting down the connection.
+    public void initializeHandler() {
         try (ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(clientSocket.getInputStream())) {
             LOGGER.info("ClientHandler started.");
@@ -37,6 +39,7 @@ public class ClientHandler {
         }
     }
 
+    // Generates the RSA keys and completes the key handshake
     private void initializeKeyExchange(ObjectOutputStream out, ObjectInputStream in)
             throws IOException, ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException {
         KeyPair serverKeyPair = KeysUtility.generateRSAKeyPair();
@@ -44,7 +47,7 @@ public class ClientHandler {
         out.writeObject(serverPublicKey);
         clientPublicKey = (PublicKey) in.readObject();
         LOGGER.info("Received client's public key.");
-
+        // receives the client's DH public key to generate a session key
         PublicKey clientDhPublicKey = (PublicKey) in.readObject();
         KeyPair dhKeyPair = KeysUtility.generateDHKeyPair();
         out.writeObject(dhKeyPair.getPublic());
@@ -52,63 +55,81 @@ public class ClientHandler {
         LOGGER.info("Key exchange complete.");
     }
 
-    private void processClientRequests(ObjectOutputStream out, ObjectInputStream in)
-            throws IOException, ClassNotFoundException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, SignatureException {
+    // recieve's the client's message and routes the request to the respective
+    // method to handle it
+    private void processClientRequests(ObjectOutputStream out, ObjectInputStream in) {
         boolean running = true;
-        while (running) {
-            String requestType = (String) in.readObject();
-            switch (requestType) {
-                case "close":
-                    running = false;
-                    break;
-                case "register":
-                    handleRegistration(out, in);
-                    break;
-                case "login":
-                    handleLogin(out, in);
-                    break;
-                case "reserve":
-                    handleReservation(out, in);
-                    break;
-                default:
-                    LOGGER.warning("Unknown request type: " + requestType);
+        try {
+            while (running) {
+                String requestType = (String) in.readObject();
+                switch (requestType) {
+                    case "close":
+                        running = false;
+                        break;
+                    case "register":
+                        handleRegistration(out, in);
+                        break;
+                    case "login":
+                        handleLogin(out, in);
+                        break;
+                    case "reserve":
+                        handleReservation(out, in);
+                        break;
+                    default:
+                        LOGGER.warning("Unknown request type: " + requestType);
+                }
             }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error Processing Client request", e);
         }
     }
 
-    private void handleRegistration(ObjectOutputStream out, ObjectInputStream in)
-            throws IOException, ClassNotFoundException {
-        UserModel user = (UserModel) in.readObject();
-        String result = userManager.registerUser(user);
-        if (result.startsWith("Registration and login successful!")) {
-            UserModel loggedInUser = userManager.loginUser(user.getEmail(), user.getPassword());
-            out.writeObject(loggedInUser);
-        } else {
-            out.writeObject(result);
+    // Handles the Registration request
+    private void handleRegistration(ObjectOutputStream out, ObjectInputStream in) {
+        try {
+            UserModel user = (UserModel) in.readObject();
+            String result = userManager.registerUser(user);
+            if (result.startsWith("Registration and login successful!")) {
+                UserModel loggedInUser = userManager.loginUser(user.getEmail(), user.getPassword());
+                out.writeObject(loggedInUser);
+            } else {
+                out.writeObject(result);
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error Processing Registration Request", e);
         }
     }
 
-    private void handleLogin(ObjectOutputStream out, ObjectInputStream in) throws IOException, ClassNotFoundException {
-        String email = EncryptionUtility.sanitize((String) in.readObject());
-        String password = EncryptionUtility.sanitize((String) in.readObject());
-        out.writeObject(userManager.loginUser(email, password));
+    // Handles the Login Request
+    private void handleLogin(ObjectOutputStream out, ObjectInputStream in) {
+        try {
+            String email = EncryptionUtility.sanitize((String) in.readObject());
+            String password = EncryptionUtility.sanitize((String) in.readObject());
+            out.writeObject(userManager.loginUser(email, password));
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error Processing Login Request", e);
+        }
     }
 
-    private void handleReservation(ObjectOutputStream out, ObjectInputStream in) throws IOException,
-            ClassNotFoundException, NoSuchAlgorithmException, InvalidKeyException, NoSuchPaddingException,
-            IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, SignatureException {
-        byte[] encryptedData = (byte[]) in.readObject();
-        byte[] signature = (byte[]) in.readObject();
-        String reservationData = EncryptionUtility.decrypt(encryptedData, sessionKey);
-        UserModel user = (UserModel) in.readObject();
-        byte[] encryptedPaymentData = (byte[]) in.readObject();
-        String paymentData = EncryptionUtility.decrypt(encryptedPaymentData, sessionKey);
+    // Handles the Reservation request
+    private void handleReservation(ObjectOutputStream out, ObjectInputStream in) {
+        try {
+            byte[] encryptedData = (byte[]) in.readObject();
+            byte[] signature = (byte[]) in.readObject();
+            String reservationData = EncryptionUtility.decrypt(encryptedData, sessionKey);
+            UserModel user = (UserModel) in.readObject();
+            byte[] encryptedPaymentData = (byte[]) in.readObject();
+            String paymentData = EncryptionUtility.decrypt(encryptedPaymentData, sessionKey);
 
-        byte[] response = reservationManager.handleReservation(reservationData, paymentData, user, sessionKey,
-                clientPublicKey, signature);
-        out.writeObject(response);
+            byte[] response = reservationManager.handleReservation(reservationData, paymentData, user, sessionKey,
+                    clientPublicKey, signature);
+            out.writeObject(response);
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error Processing Reservation Request", e);
+        }
     }
 
+    // Closes the network connection
     private void closeConnection() {
         try (clientSocket) {
             LOGGER.info("ClientHandler is closing resources.");

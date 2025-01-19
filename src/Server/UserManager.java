@@ -1,18 +1,33 @@
 package Server;
 
+import java.util.Scanner;
+
 import Utilities.DatabaseManager;
 import Utilities.EncryptionUtility;
 import Utilities.UserModel;
-// import java.util.logging.Logger;
 
 public class UserManager {
-    //private static final Logger LOGGER = Logger.getLogger(UserManager.class.getName());
-
+    // Attempts the Registration process
     public String registerUser(UserModel user) {
         UserModel sanitizedUser = sanitizeUser(user);
         String validationResult = validateUser(sanitizedUser);
+        // If the registered user type is an employee
+        // a confirmation from the admin (server) is required
+        if (user.getUserType() == "employee") {
+            Scanner admin_input = new Scanner(System.in);
+            System.out.println("Registration attempt by an employee");
+            System.out.println("Do you Confirm (Y/N)");
+            String confirm = admin_input.nextLine();
+            if (confirm != "Y" || confirm != "y") {
+                admin_input.close();
+                return "Registration as an employee failed confirmation from admin";
+            }
+            admin_input.close();
+        }
+        // if the user is valid then the user is added to the DB
         if ("Valid".equals(validationResult)) {
             boolean registrationSuccess = new DatabaseManager().registerUser(sanitizedUser);
+            // if the registration is successful the client automatically logs in
             if (registrationSuccess) {
                 UserModel loggedInUser = loginUser(sanitizedUser.getEmail(), sanitizedUser.getPassword());
                 if (loggedInUser != null) {
@@ -28,10 +43,13 @@ public class UserManager {
         }
     }
 
+    // Attempts login request to the DB
     public UserModel loginUser(String email, String password) {
         return new DatabaseManager().loginUser(email, password);
     }
 
+    // Santizing the user before attempting to register to the DB
+    // To protect from SQL injection and XSS attacks
     private UserModel sanitizeUser(UserModel user) {
         return new UserModel(
                 EncryptionUtility.sanitize(user.getFullName()),
@@ -42,6 +60,7 @@ public class UserManager {
                 EncryptionUtility.sanitize(user.getPassword()));
     }
 
+    // Validating the user's information to match certain criterea
     private String validateUser(UserModel user) {
         if (!user.getEmail().matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$")) {
             return "Email is not in a valid format.";

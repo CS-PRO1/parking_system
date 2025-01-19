@@ -13,6 +13,7 @@ public class UserInputModule {
         this.scanner = new Scanner(System.in);
     }
 
+    // Method to display the options to the user and handle the inputs
     public void handleUserInput(UserModel currentUser, ClientOperations ops,
             ObjectOutputStream out, ObjectInputStream in, Logger LOGGER) throws Exception {
         boolean running = true;
@@ -45,7 +46,7 @@ public class UserInputModule {
         }
     }
 
-    // General string input
+    // General string input getter
     public String getStringInput(String prompt) {
         System.out.print(prompt);
         return scanner.nextLine();

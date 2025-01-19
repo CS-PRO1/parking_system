@@ -17,6 +17,8 @@ public class KeyExchangeModule {
     private PrivateKey clientPrivateKey;
     private PublicKey clientPublicKey;
 
+    // Performs the key generation process and the handshake procedure between the
+    // server and the client
     public void performKeyExchange(Socket socket, ObjectOutputStream out, ObjectInputStream in) throws Exception {
         KeyPair clientKeyPair = KeysUtility.generateRSAKeyPair();
         clientPublicKey = clientKeyPair.getPublic();
@@ -38,7 +40,7 @@ public class KeyExchangeModule {
         LOGGER.info("Session Key (Client): " + EncryptionUtility.bytesToHex(sessionKey.getEncoded()));
     }
 
-    // Getters remain the same
+    // Getter functions
     public SecretKey getSessionKey() {
         return sessionKey;
     }

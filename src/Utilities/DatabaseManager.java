@@ -1,4 +1,5 @@
 package Utilities;
+
 import java.sql.*;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -9,6 +10,7 @@ public class DatabaseManager {
     private static final String DB_PASSWORD = "password";
     private static final Logger LOGGER = Logger.getLogger(DatabaseManager.class.getName());
 
+    // Adds the user to the DB upon registeration
     public boolean registerUser(UserModel user) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "INSERT INTO users (full_name, user_type, phone_number, car_plate, email, password) VALUES (?, ?, ?, ?, ?, ?)";
@@ -28,6 +30,7 @@ public class DatabaseManager {
         }
     }
 
+    // requests login info from the DB
     public UserModel loginUser(String email, String password) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "SELECT * FROM users WHERE email = ? AND password = ?";
@@ -52,6 +55,7 @@ public class DatabaseManager {
         return null;
     }
 
+    // Checks if an email is already used by a previous user
     public boolean emailExists(String email) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "SELECT * FROM users WHERE email = ?";
@@ -67,6 +71,7 @@ public class DatabaseManager {
         return false;
     }
 
+    // Checks if the spot the client tries to reserve has been already reserved
     public boolean isSpotReserved(String parkingSpot, String time) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "SELECT * FROM reservations WHERE parking_spot = ? AND reservation_time = ?";
@@ -83,6 +88,7 @@ public class DatabaseManager {
         return false;
     }
 
+    // Reserving the Spot and adding the info to the DB
     public boolean reserveSpot(String userEmail, String parkingSpot, String time) {
         LOGGER.info("Entered reserveSpot function.");
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
@@ -104,6 +110,7 @@ public class DatabaseManager {
         return false;
     }
 
+    // Processes user payment info to the DB
     public boolean processPayment(String creditCardNumber, String pin) {
         LOGGER.info("Processing payment with card: " + creditCardNumber + " and PIN: " + pin);
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
@@ -120,6 +127,7 @@ public class DatabaseManager {
         return false;
     }
 
+    // logs all clients activity in a table in the DB
     public void logActivity(String userEmail, String requestData, String signature) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             String query = "INSERT INTO activity_log (user_email, request_data, signature) VALUES (?, ?, ?)";
