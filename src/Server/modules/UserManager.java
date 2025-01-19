@@ -1,4 +1,4 @@
-package Server;
+package Server.modules;
 
 import Utilities.DatabaseManager;
 import Utilities.EncryptionUtility;

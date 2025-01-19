@@ -5,6 +5,9 @@ import java.net.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
+
+import Server.modules.ClientHandler;
+
 import java.util.logging.Level;
 
 public class ParkingServer {

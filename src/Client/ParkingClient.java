@@ -7,6 +7,10 @@ import Utilities.UserModel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import Client.modules.ClientOperations;
+import Client.modules.KeyExchangeModule;
+import Client.modules.UserInputModule;
+
 public class ParkingClient {
     private static final String SERVER_ADDRESS = "localhost";
     private static final int SERVER_PORT = 3000;
