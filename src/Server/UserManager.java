@@ -1,7 +1,5 @@
 package Server;
 
-import java.util.Scanner;
-
 import Utilities.DatabaseManager;
 import Utilities.EncryptionUtility;
 import Utilities.UserModel;
@@ -11,19 +9,6 @@ public class UserManager {
     public String registerUser(UserModel user) {
         UserModel sanitizedUser = sanitizeUser(user);
         String validationResult = validateUser(sanitizedUser);
-        // If the registered user type is an employee
-        // a confirmation from the admin (server) is required
-        if (user.getUserType() == "employee") {
-            Scanner admin_input = new Scanner(System.in);
-            System.out.println("Registration attempt by an employee");
-            System.out.println("Do you Confirm (Y/N)");
-            String confirm = admin_input.nextLine();
-            if (confirm != "Y" || confirm != "y") {
-                admin_input.close();
-                return "Registration as an employee failed confirmation from admin";
-            }
-            admin_input.close();
-        }
         // if the user is valid then the user is added to the DB
         if ("Valid".equals(validationResult)) {
             boolean registrationSuccess = new DatabaseManager().registerUser(sanitizedUser);
