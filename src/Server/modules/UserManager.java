@@ -14,25 +14,7 @@ public class UserManager {
 
     private static final Logger LOGGER = Logger.getLogger(ParkingServer.class.getName());
 
-    // Helper method for hashing
-    private String hashPassword(String password) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hash = md.digest(password.getBytes("UTF-8"));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1)
-                    hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (NoSuchAlgorithmException | java.io.UnsupportedEncodingException e) {
-            LOGGER.log(Level.SEVERE, "Hashing failed", e);
-            return null;
-        }
-    }
-
+    //Attempts user registration to the system
     public String registerUser(UserModel user) {
         UserModel sanitizedUser = sanitizeUser(user);
         String validationResult = validateUser(sanitizedUser);
@@ -124,5 +106,24 @@ public class UserManager {
             return "Email is already registered.";
         }
         return "Valid";
+    }
+
+    // Helper method for hashing the password
+    private String hashPassword(String password) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(password.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1)
+                    hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException | java.io.UnsupportedEncodingException e) {
+            LOGGER.log(Level.SEVERE, "Hashing failed", e);
+            return null;
+        }
     }
 }
