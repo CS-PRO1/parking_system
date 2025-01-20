@@ -49,4 +49,28 @@ public class UserModel implements Serializable {
         System.out.println("Email: " + this.email);
         System.out.println("Phone Number: " + this.phoneNumber);
     }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public void setUserType(String userType) {
+        this.userType = userType;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public void setCarPlate(String carPlate) {
+        this.carPlate = carPlate;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
 }

@@ -1,27 +1,69 @@
 package Server.modules;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import Server.ParkingServer;
 import Utilities.DatabaseManager;
 import Utilities.EncryptionUtility;
 import Utilities.UserModel;
 
 public class UserManager {
-    // Attempts the Registration process
+
+    private static final Logger LOGGER = Logger.getLogger(ParkingServer.class.getName());
+
+    // Helper method for hashing
+    private String hashPassword(String password) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(password.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1)
+                    hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException | java.io.UnsupportedEncodingException e) {
+            LOGGER.log(Level.SEVERE, "Hashing failed", e);
+            return null;
+        }
+    }
+
     public String registerUser(UserModel user) {
         UserModel sanitizedUser = sanitizeUser(user);
         String validationResult = validateUser(sanitizedUser);
-        // if the user is valid then the user is added to the DB
         if ("Valid".equals(validationResult)) {
-            boolean registrationSuccess = new DatabaseManager().registerUser(sanitizedUser);
-            // if the registration is successful the client automatically logs in
-            if (registrationSuccess) {
-                UserModel loggedInUser = loginUser(sanitizedUser.getEmail(), sanitizedUser.getPassword());
-                if (loggedInUser != null) {
-                    return "Registration and login successful!";
-                } else {
-                    return "Login failed after registration. Please try to login manually.";
+            try {
+                // Store the original password temporarily
+                String originalPassword = sanitizedUser.getPassword();
+                // Hash the password before storing
+                String hashedPassword = hashPassword(originalPassword);
+                if (hashedPassword == null) {
+                    return "Registration failed due to an internal error.";
                 }
-            } else {
-                return "Registration failed. Please try again.";
+                sanitizedUser.setPassword(hashedPassword);
+                LOGGER.info("Original Password: " + originalPassword);
+                LOGGER.info("Hashed Password Stored: " + hashedPassword);
+
+                boolean registrationSuccess = new DatabaseManager().registerUser(sanitizedUser);
+                if (registrationSuccess) {
+                    // Use the original password for login attempt
+                    UserModel loggedInUser = loginUser(sanitizedUser.getEmail(), originalPassword);
+                    if (loggedInUser != null) {
+                        return "Registration and login successful!";
+                    } else {
+                        return "Login failed after registration. Please try to login manually.";
+                    }
+                } else {
+                    return "Registration failed. Please try again.";
+                }
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Error during registration", e);
+                return "Registration failed due to an internal error.";
             }
         } else {
             return validationResult;
@@ -29,8 +71,24 @@ public class UserManager {
     }
 
     // Attempts login request to the DB
-    public UserModel loginUser(String email, String password) {
-        return new DatabaseManager().loginUser(email, password);
+    public UserModel loginUser(String email, String providedPassword) {
+        try {
+
+            UserModel user = new DatabaseManager().getUserByEmail(email);
+            if (user != null) {
+                // Hash the provided password for comparison
+                String hashedAttempt = hashPassword(providedPassword);
+                LOGGER.info("Login Attempt Password: " + providedPassword);
+                LOGGER.info("Hashed Login Attempt: " + hashedAttempt);
+                LOGGER.info("Stored Password: " + user.getPassword());
+                if (hashedAttempt.equals(user.getPassword())) {
+                    return user;
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Error during login attempt", e);
+        }
+        return null;
     }
 
     // Santizing the user before attempting to register to the DB

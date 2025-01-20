@@ -23,12 +23,12 @@ public class ParkingClient {
         try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
                 ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
                 ObjectInputStream in = new ObjectInputStream(socket.getInputStream())) {
-            // Creating an instance of the key echange module to generate keys and perform
-            // handshake with the server
+            // Creating an instance of the key echange module to generate keys
+            // and perform handshake with the server
             KeyExchangeModule keyExchange = new KeyExchangeModule();
             keyExchange.performKeyExchange(socket, out, in);
-            // Creating an instance of the client operation module to handle the client's
-            // requests
+            // Creating an instance of the client operation module
+            // this handles the client's requests
             ClientOperations ops = new ClientOperations(
                     keyExchange.getSessionKey(),
                     keyExchange.getClientPrivateKey(),

@@ -33,10 +33,9 @@ public class DatabaseManager {
     // requests login info from the DB
     public UserModel loginUser(String email, String password) {
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
-            String query = "SELECT * FROM users WHERE email = ? AND password = ?";
+            String query = "SELECT * FROM users WHERE email = ?";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, email);
-                stmt.setString(2, password);
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         return new UserModel(
@@ -51,6 +50,30 @@ public class DatabaseManager {
             }
         } catch (SQLException e) {
             LOGGER.log(Level.SEVERE, "Error logging in user.", e);
+        }
+        return null;
+    }
+
+    // method to get user by email only for login purposes
+    public UserModel getUserByEmail(String email) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            String query = "SELECT * FROM users WHERE email = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setString(1, email);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return new UserModel(
+                                rs.getString("full_name"),
+                                rs.getString("user_type"),
+                                rs.getString("phone_number"),
+                                rs.getString("car_plate"),
+                                rs.getString("email"),
+                                rs.getString("password"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Error fetching user by email.", e);
         }
         return null;
     }
